@@ -1,0 +1,123 @@
+import os
+import sys
+import importlib
+
+
+class Plugin():
+    """Class used to handle a basic plugin system.
+
+    """
+
+    def __init__(self, path):
+
+        self.path = path
+        self.commands_dict = {}
+        sys.path.append(self.path)
+
+    def _load_config(self):
+        """Load config file and plugin."""
+
+        if not os.path.exists("plugin.cfg"):
+            raise IOError("No 'plugin.cfg' found!")
+        with open("plugin.cfg") as f:
+            for line in f.readlines()[2:]:  # The first 2 lines are skipped
+                filename, classname = [x.strip() for x in line.split(":")]
+                # Check if it is a valid plugin
+                if os.path.exists(filename) and filename.endswith(".py"):
+                    print(filename, classname)
+                    self.load(filename, classname)
+                else:
+                    print("!There was an issue loading the '%s' plugin [skipped]" % filename)
+
+    def load(self, fname, cname):
+        """Load a plugin, given its filename and classname"""
+
+        name, _ = os.path.splitext(fname)
+        module = importlib.import_module(name)
+        globals()[name] = module
+        p = getattr(module, cname)()
+        # TODO: Handle error, if get_commands ok
+        # TODO: check if command is not already in the dict
+        self.commands_dict[name] = {"classname" : cname, "commands" : p.get_commands()}
+
+    def load_all(self):
+        """Load all plugins in the given path."""
+
+        # Add the plugins dir to the system path
+        sys.path.append(self.path)
+        for fname in os.listdir(self.path):
+            if fname.endswith(".py"):  # Check all py file in the plugins dir
+                name, _ = os.path.splitext(fname)
+                m = importlib.import_module(name)  # Import the plugin
+                globals()[name] = m  # Add it to the global sys table
+                # Take the command list
+                # Note: All PluginClass class need get_commands method
+                f = getattr(m, 'PluginClass')()
+                self.commands_dict[name] = f.get_commands()
+
+    def run(self, query):
+        """Run a command of the loaded plugins."""
+
+        # If there is a space char, split command from args
+        if " " in query:
+            cmd, cargs = query.split(" ", maxsplit=1)
+        else:
+            cmd = query
+            cargs = None
+        # Check if built-int help comand
+        if cmd == 'help' or cmd == 'h':
+            return self.doc(cargs)
+
+        # Otherwise check for external plugin
+        for plugin in self.commands_dict:
+            if cmd in self.commands_dict[plugin]["commands"]:
+                # Execute command
+                p = globals()["plugin"]  # Take the istance from global symbol table
+                f = getattr(p, self.commands_dict[plugin]["classname"])()
+                f2 = getattr(f, self.commands_dict[plugin]["commands"][cmd])
+                if cargs is not None:
+                    return f2(cargs)
+                else:
+                    return f2()
+        print("No such command was found")  # Rprint
+
+    def doc(self, cmd):
+        """Return the doc about a plugin (if any)
+
+        Use python builtin __doc__ for help."""
+
+        for plugin in self.commands_dict:
+            if cmd in self.commands_dict[plugin]["commands"]:
+                # Execute command
+                p = globals()["plugin"]
+                f = getattr(p, self.commands_dict[plugin]["classname"])()
+                f2 = getattr(f, self.commands_dict[plugin]["commands"][cmd])
+                print(f2.__doc__)  # Rprint
+            else:
+                print("Can't show help information.\nNo such plugin was found!")  # RPrint
+
+# ex = plugin.PluginClass"()
+'''p = globals()["plugin"]  # Take the istance from global symbol table
+f = getattr(p, 'PluginClass"')
+f()
+f2 = getattr(f(), 'print_test')
+f2()'''
+test = Plugin("Plugins")
+#test.load_all()
+test.run("printtest")
+test._load_config()
+while True:
+    cmd = input("#-->")
+    test.run(cmd)
+
+#Nota: al metodo chiamato viene passato un unico argomento se la query aveva spazi:
+#<cmd>[space]<args_of_method>
+# Ex. help printtest
+# Call help cmd with "printtest" args
+# Every plugin needs a get_commands method used to retrieve the list of commands
+# Every method in the plugin class NEED to return a dictionary
+# Adding a plugin is easy as copying the plugin file to the Plugins folder and
+#  add a new entry in plugin.cfg in the following format:
+#<filenameofplugin.py> : <classname of plugin>
+# The parser use : to split and ignore any space (You can use tab for formatting cfg file)
+
