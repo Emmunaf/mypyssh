@@ -2,6 +2,11 @@ import os
 import sys
 import importlib
 
+'''
+rcode
+message
+'''
+
 
 class Plugin():
     """Class used to handle a basic plugin system.
@@ -25,7 +30,7 @@ class Plugin():
             for line in f.readlines()[2:]:  # The first 2 lines are skipped
                 filename, classname = [x.strip() for x in line.split(":")]
                 # Check if it is a valid plugin
-                if os.path.exists('plugins/'+filename) and filename.endswith(".py"):
+                if os.path.exists('plugins/' + filename) and filename.endswith(".py"):
                     print(filename, classname)
                     self.load(filename, classname)
                 else:
@@ -34,17 +39,23 @@ class Plugin():
     def load(self, fname, cname):
         """Load a plugin, given its filename and classname"""
 
-        name, _ = os.path.splitext(fname)
-        module = importlib.import_module(name)
+        mname, _ = os.path.splitext(fname)
+        module = importlib.import_module(mname)
         globals()[cname] = module
         p = getattr(module, cname)()
         # TODO: Handle error, if get_commands ok
         # TODO: check if command is not already in the dict
-        self.commands_dict[name] = {"classname" : cname, "commands" : p.get_commands()}
-
+        print(p.get_commands())
+        # method is the name of the methode associated with the alias
+        try:
+            for alias, method in p.get_commands().items():
+                self.commands_dict[alias] = {"classname": cname, "modulename": mname, "method": method}
+        except Exception as e:
+            del globals()[cname]
+            print("Can't load the plugin: " + fname + "! [skipped]")
 
     def run(self, query):
-        """Run a command of the loaded plugins."""
+        """Run a command of one loaded plugin."""
 
         # If there is a space char, split command from args
         if " " in query:
@@ -55,62 +66,65 @@ class Plugin():
         # Check if built-int help comand
         if cmd == 'help' or cmd == 'h':
             return self.doc(cargs)
-
         # Otherwise check for external plugin
-        for plugin in self.commands_dict:
-            if cmd in self.commands_dict[plugin]["commands"]:
-                # Execute command
-                # Take the istance from global symbol table
-                p = globals()[self.commands_dict[plugin]["classname"]] 
-                f = getattr(p, self.commands_dict[plugin]["classname"])()
-                f2 = getattr(f, self.commands_dict[plugin]["commands"][cmd])
-                try:
-                    if cargs is not None:
-                        return f2(cargs)
-                    else:
-                        return f2()
-                except:
-                    print("Can't run the plugin. Check your plugin.")  # Rprint
-                    return -1
-        print("No such command was found")  # Rprint
+        # Execute command if the command is in the commands dictionary
+        if cmd not in self.commands_dict:
+            print("There is no a such command.")  # Rprint
+            return -1
+
+        # Take the istance from global symbol table
+        p = globals()[self.commands_dict[cmd]["classname"]]
+        f = getattr(p, self.commands_dict[cmd]["classname"])()
+        f2 = getattr(f, self.commands_dict[cmd]["method"])
+        try:
+            if cargs is not None:
+                return f2(cargs)
+            else:
+                return f2()
+        except:
+            print("Can't run the plugin. Check the doc of your plugin. [help " + cmd + "]")  # Rprint
+            return -1
 
     def doc(self, cmd):
         """Return the doc about a plugin (if any)
 
         Use python builtin __doc__ for help."""
+        if cmd is None:
+            print("Here there is a list of your installed plugin!")
+            print("[Use help <plugin name> to read the doc about that plugin.]\n")
+            # Show the list of all plugins
+            for command in self.commands_dict.keys():
+                print(command)
+            return 0
+        if cmd not in self.commands_dict:
+            print("Can't show help information.\nNo such a plugin was found!")
+            return -1
+        p = globals()[self.commands_dict[cmd]["classname"]]
+        f = getattr(p, self.commands_dict[cmd]["classname"])
+        f2 = getattr(f, self.commands_dict[cmd]["method"])
+        print(f2.__doc__)
 
-        for plugin in self.commands_dict:
-            if cmd in self.commands_dict[plugin]["commands"]:
-                # Execute command
-                p = globals()[self.commands_dict[plugin]["classname"]]
-                f = getattr(p, self.commands_dict[plugin]["classname"])()
-                f2 = getattr(f, self.commands_dict[plugin]["commands"][cmd])
-                print(f2.__doc__)  # Rprint
-            else:
-                print("Can't show help information.\nNo such plugin was found!")  # RPrint
 
-# ex = plugin.PluginClass"()
 '''p = globals()["plugin"]  # Take the istance from global symbol table
 f = getattr(p, 'PluginClass"')
 f()
 f2 = getattr(f(), 'print_test')
 f2()'''
 test = Plugin("Plugins")
-#test.load_all()
-test.run("printtest")
+# test.load_all()
+# test.run("printtest")
 test._load_config()
 while True:
     cmd = input("#-->")
     test.run(cmd)
 
-#Nota: al metodo chiamato viene passato un unico argomento se la query aveva spazi:
-#<cmd>[space]<args_of_method>
+# Nota: al metodo chiamato viene passato un unico argomento se la query aveva spazi:
+# <cmd>[space]<args_of_method>
 # Ex. help printtest
 # Call help cmd with "printtest" args
 # Every plugin needs a get_commands method used to retrieve the list of commands
 # Every method in the plugin class NEED to return a dictionary
 # Adding a plugin is easy as copying the plugin file to the Plugins folder and
 #  add a new entry in plugin.cfg in the following format:
-#<filenameofplugin.py> : <classname of plugin>
+# <filenameofplugin.py> : <classname of plugin>
 # The parser use : to split and ignore any space (You can use tab for formatting cfg file)
-
