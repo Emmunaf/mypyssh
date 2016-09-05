@@ -9,13 +9,16 @@ message
 
 
 class Plugin():
-    """Class used to handle a basic plugin system.
+    """Class used to handle a (very) simple plugin system.
 
     """
 
     def __init__(self, path):
-        """Path is the directory where plugins are stored.
-        """
+        """Initialize a Plugin class.
+
+        Keyword arguments:
+        path -- path of th plugins folder."""
+
         self.path = path
         self.commands_dict = {}
         # Add to sys_path the plugins dir
@@ -31,7 +34,7 @@ class Plugin():
                 filename, classname = [x.strip() for x in line.split(":")]
                 # Check if it is a valid plugin
                 if os.path.exists('plugins/' + filename) and filename.endswith(".py"):
-                    print(filename, classname)
+                    #print(filename, classname)
                     self.load(filename, classname)
                 else:
                     print("!There was an issue loading the '%s' plugin [skipped]" % filename)
@@ -89,6 +92,7 @@ class Plugin():
         """Return the doc about a plugin (if any)
 
         Use python builtin __doc__ for help."""
+
         if cmd is None:
             print("Here there is a list of your installed plugin!")
             print("[Use help <plugin name> to read the doc about that plugin.]\n")
