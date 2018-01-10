@@ -8,7 +8,7 @@ message
 '''
 
 
-class Plugin():
+class Plugin(object):
     """Class used to handle a (very) simple plugin system.
 
     """
@@ -23,6 +23,8 @@ class Plugin():
         self.commands_dict = {}
         # Add to sys_path the plugins dir
         sys.path.append(self.path)
+        # Load plugins
+        self._load_config()
 
     def _load_config(self):
         """Load config file and plugin."""
@@ -35,11 +37,11 @@ class Plugin():
                 # Check if it is a valid plugin
                 if os.path.exists('plugins/' + filename) and filename.endswith(".py"):
                     #print(filename, classname)
-                    self.load(filename, classname)
+                    self._load(filename, classname)
                 else:
                     print("!There was an issue loading the '%s' plugin [skipped]" % filename)
 
-    def load(self, fname, cname):
+    def _load(self, fname, cname):
         """Load a plugin, given its filename and classname"""
 
         mname, _ = os.path.splitext(fname)
@@ -48,14 +50,16 @@ class Plugin():
         p = getattr(module, cname)()
         # TODO: Handle error, if get_commands ok
         # TODO: check if command is not already in the dict
-        print(p.get_commands())
-        # method is the name of the methode associated with the alias
+        # print(p.get_commands())  # for debug purpose
+        # method is the name of the method associated with the alias
         try:
             for alias, method in p.get_commands().items():
                 self.commands_dict[alias] = {"classname": cname, "modulename": mname, "method": method}
         except Exception as e:
             del globals()[cname]
             print("Can't load the plugin: " + fname + "! [skipped]")
+            print("\tError: [" + e + "]")
+
 
     def run(self, query):
         """Run a command of one loaded plugin."""
@@ -75,13 +79,13 @@ class Plugin():
             print("There is no a such command.")  # Rprint
             return -1
 
-        # Take the istance from global symbol table
+        # Take the instance from global symbol table
         p = globals()[self.commands_dict[cmd]["classname"]]
         f = getattr(p, self.commands_dict[cmd]["classname"])()
         f2 = getattr(f, self.commands_dict[cmd]["method"])
         try:
             if cargs is not None:
-                return f2(cargs)
+                return f2(cargs)["message"]
             else:
                 return f2()
         except:
@@ -114,13 +118,13 @@ f = getattr(p, 'PluginClass"')
 f()
 f2 = getattr(f(), 'print_test')
 f2()'''
-test = Plugin("Plugins")
+"""test = Plugin("Plugins")
 # test.load_all()
 # test.run("printtest")
-test._load_config()
 while True:
     cmd = input("#-->")
     test.run(cmd)
+    """
 
 # Nota: al metodo chiamato viene passato un unico argomento se la query aveva spazi:
 # <cmd>[space]<args_of_method>

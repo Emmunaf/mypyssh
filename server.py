@@ -6,7 +6,7 @@ from Crypto.PublicKey import RSA
 import os
 import AESCipher
 import threading
-
+import Plugin
 
 class Server(object):
     """A server class used to handle client connection and command execution.
@@ -25,10 +25,11 @@ class Server(object):
         port -- used port [default: 1604]
         """
 
-        self.host = host
-        self.port = port
+        self._host = host
+        self._port = port
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Creates an INET socket STREAM-type
         self.s.bind((host, port))  # Binds the socket to an host and a port
+        self.plugin = Plugin.Plugin("Plugins")
 
     def wait_connection(self):
         """ Wait for a new connection and start a new thread to handle the connection."""
@@ -37,7 +38,7 @@ class Server(object):
         while True:
             try:
                 sock_client, address = self.s.accept()
-                sock_client.settimeout(180)
+                sock_client.settimeout(1800)
                 threading.Thread(target=self._listen_client, args=(sock_client, address)).start()
             except (KeyboardInterrupt, SystemExit):
                 print("The server is shutdown")
@@ -66,12 +67,21 @@ class Server(object):
         while True:
             data = sock_client.recv(1024)
             if data:
-                cmd = aesc.decrypt(data)
-                sock_client.sendall(aesc.encrypt("Server....PONG!"))
+                cmd = str(aesc.decrypt(data), 'utf-8')  # Casting needed because decrypt returns bytes not string
+                result = self.plugin.run(cmd)  # HERE plugin
+                sock_client.sendall(aesc.encrypt(result))
             else:
                 print("Client with addr:", address, "went offline.")
                 sock_client.close()
                 return -1
+
+    def get_host(self):
+        """Return the host"""
+        return self._host
+
+    def get_port(self):
+        """Return the port"""
+        return self._port
 
     @staticmethod
     def RSAencrypt(pubkey, message):
